@@ -1,22 +1,22 @@
 /***
 
 Universidad del Valle de Guatemala
-IE2023: Programación de Microcontroladores
+IE2023: ProgramaciÃ³n de Microcontroladores
 Lab3.asm
 Autor: Alexander Rosales
 Proyecto: Proyecto 1
 Hardware: ATMEGA328P
 Creado: 20/02/2024
-Última Modificación: 20/02/2024
+Ãšltima ModificaciÃ³n: 20/02/2024
 
 ***/
 
 /***
 ENCABEZADO
 ***/
-.INCLUDE "M328PDEF.INC" //librería con nombres
+.INCLUDE "M328PDEF.INC" //librerÃ­a con nombres
 .CSEG //Empieza el codigo
-.ORG 0x00 //Se inicia en la posición 00
+.ORG 0x00 //Se inicia en la posiciÃ³n 00
 
 JMP EmpezarCodigo
 
@@ -31,7 +31,7 @@ EmpezarCodigo:
 /*
 STACK POINTER
 */
-//Registro en la memoria que nos indica el rango en donde se guardarán las variables locales 
+//Registro en la memoria que nos indica el rango en donde se guardarÃ¡n las variables locales 
 LDI R16, LOW(RAMEND)
 OUT SPL, R16
 LDI R17, HIGH(RAMEND)
@@ -39,7 +39,7 @@ OUT SPH, R17
 
 
 /**
-CONFIGURACIÓN
+CONFIGURACIÃ“N
 **/
 Setup:
 	
@@ -54,7 +54,7 @@ Setup:
 	LDI R16, 0b0000_0000 //Se configura el puerto c como entradas 
 	OUT DDRC, R16
 
-	LDI R16, 0x00 //Se desactiva la led de TX y RX que constantemente está encendida
+	LDI R16, 0x00 //Se desactiva la led de TX y RX que constantemente estÃ¡ encendida
 	STS UCSR0B, R16
 
 	LDI R16, 0b1111_1111 //Se configura puerdo B Y D como salidas 
@@ -249,7 +249,7 @@ RegresarFlag:
 **************************************************************************/
 
 T0:
-	LDI R16, (1 << CS02) | (1 << CS00) //Configuración del pre escalado a 1024
+	LDI R16, (1 << CS02) | (1 << CS00) //ConfiguraciÃ³n del pre escalado a 1024
 	OUT TCCR0B, R16
 
 	LDI R16, 178
