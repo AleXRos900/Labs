@@ -56,6 +56,8 @@ Setup:
 	.def Config = R19
 	.def Estado = R20
 	.def Dos_Puntos = R24
+	.def AlarmaON = R23
+	.def Cada500ms = R22
 
 	LDI R16, 0b1000_0000 //Activar el prescaler
 	STS CLKPR, R16
@@ -92,8 +94,8 @@ Setup:
 	CLR R19	//Config
 	CLR R20 //Estado
 	CLR R21 //Uso Multiple
-	CLR R22	//
-	CLR R23 //
+	CLR R22	//Contador de 500ms
+	CLR R23 //SonarAlarma
 	CLR R24 //Dos Puntos
 	CLR R25 //Contador segundos de la bandera TOV0 
 	CLR R26 //Contador minuto de la bandera TOV0
@@ -133,6 +135,8 @@ Setup:
 	.equ ALARMA2Config = 0x0126 //Display 2 CONFIGURANDO ALARMA
 	.equ ALARMA3Config = 0x0127 //Display 3 CONFIGURANDO ALARMA
 	.equ ALARMA4Config = 0x0128 //Display 4 CONFIGURANDO ALARMA
+
+	.equ Contador500msDesactualizado = 0x010A 
 	 
 	STS RELOJ1, R16
 	STS RELOJ2, R16
@@ -155,15 +159,20 @@ Setup:
 	STS FECHA3Config, R16
 	STS FECHA4Config, R16
 
+	LDI R16, 1
 	STS ALARMA1, R16
 	STS ALARMA2, R16
 	STS ALARMA3, R16
 	STS ALARMA4, R16
+
+	CLR R16
 	STS ALARMA1Config, R16
 	STS ALARMA2Config, R16
 	STS ALARMA3Config, R16
 	STS ALARMA4Config, R16
 	STS DisplayConfigurando, R16
+
+	STS Contador500msDesactualizado, R16
 
 	LDI ZL, LOW (Tabla << 1)
 	LDI ZH, HIGH (Tabla << 1)
@@ -178,7 +187,56 @@ DosPuntosOn:
 	LDI Dos_Puntos, 0b1000_0000
 RJMP SeguirDosPuntos
 
+CLR R16
+STS Contador500msDesactualizado, Cada500ms
+
 Loop:
+
+	CPI AlarmaON, 1
+	BRNE EjecutarLoopConEstados
+
+	//Millis :D
+	CLR R16
+		LDS R16, Contador500msDesactualizado
+		CP R16, Cada500ms
+		BREQ NoAumentarContador500
+			MOV R16, Cada500ms
+			STS Contador500msDesactualizado, R16
+			INC R18
+			CPI R18, 3
+			BRNE NoAumentarContador500
+			CLR R18
+	NoAumentarContador500:
+
+	//--------------------LED
+		LDI R16, 0b_0001_0000
+		OUT PORTB, R16
+
+		//Selector Dependiendo de R18
+			LDI R17, 0
+
+			CPI R18, 0
+			BRNE Salto1_LEDAlarma
+			LDI R17, 0b0000_1000
+			Salto1_LEDAlarma:
+
+			CPI R18, 1
+			BRNE Salto2_LEDAlarma
+			LDI R17, 0b0000_0100
+			Salto2_LEDAlarma:
+
+			CPI R18, 2
+			BRNE Salto3_LEDAlarma
+			LDI R17, 0b0001_0000
+			Salto3_LEDAlarma:
+
+		OUT PORTD, R17
+	
+		RCALL Delay
+	//--------------------LED
+
+	RJMP Loop
+	EjecutarLoopConEstados:
 	
 	SBRC R29, 0
 	RJMP DosPuntosOn
@@ -566,10 +624,16 @@ DecimaSegundo:
 MedioSegundo:
 	LDI R16, 1
 	EOR R29, R16
+	INC Cada500ms
 	RJMP SeguirMedioSegundo
 
 Flag0Check:	
 	
+	PUSH R16
+	PUSH R17
+	PUSH R18
+	PUSH R21
+
 	LDI R16, 178
 	OUT TCNT0, R16
 
@@ -588,7 +652,7 @@ Flag0Check:
 
 	CLR R25
 	INC R26
-	CPI R26, 60
+	CPI R26, 1
 	BRNE RegresarFlagTimer0
 
 	CLR R26
@@ -605,10 +669,45 @@ Flag0Check:
 	CLR R16
 	LDS R16, RELOJ4
 	CPI R16, 2
-	BREQ ReiniciarDia
+	BRNE SeguirFinalReloj
+	RJMP ReiniciarDia
+	
 	SeguirFinalReloj:
+	RegresarFlagTimer0:
 
-RegresarFlagTimer0:
+	CLR R16
+	CLR R17
+	LDS R16, RELOJ1
+	LDS R17, ALARMA1
+	CP R16, R17
+	BRNE NoSonarAlarma
+		CLR R16
+		CLR R17
+		LDS R16, RELOJ2
+		LDS R17, ALARMA2
+		CP R16, R17
+		BRNE NoSonarAlarma
+			CLR R16
+			CLR R17
+			LDS R16, RELOJ3
+			LDS R17, ALARMA3
+			CP R16, R17
+			BRNE NoSonarAlarma
+				CLR R16
+				CLR R17
+				LDS R16, RELOJ4
+				LDS R17, ALARMA4
+				CP R16, R17
+				BRNE NoSonarAlarma
+				LDI AlarmaON, 1
+				CLR R18
+				PUSH R18
+	NoSonarAlarma:
+
+	POP R16
+	POP R17
+	POP R18 
+	POP R21
 	RETI
 
 	ReiniciarContador1:
@@ -943,13 +1042,24 @@ ConfigSiguienteDigito:
 	STS DisplayConfigurando, R17
 	RET
 
+ApagarAlarma:
+	CLR AlarmaOn
+RET
 
 IBotones:
+
+	PUSH R16
+	PUSH R17
+	PUSH R18
+	PUSH R21
 
 	IN R16, PINC
 
 	SBRS R16, PC3
 	RCALL ToggleConfig
+
+	SBRS R16, PC2
+	RCALL ApagarAlarma
 	
 	SBRC Config, 0
 	RJMP Botones_Modo_Config
@@ -1009,14 +1119,27 @@ Botones_Modo_Config:
 
 		CLR R16
 		LDS R16, DisplayConfigurando
+		
 		CPI R16, 0
-		BREQ OperacionRelojDisplay1
+		BRNE NEXT1_ConfigReloj
+		RJMP OperacionRelojDisplay1
+		NEXT1_ConfigReloj:
+
 		CPI R16, 1
-		BREQ OperacionRelojDisplay2
+		BRNE NEXT2_ConfigReloj
+		RJMP OperacionRelojDisplay2
+		NEXT2_ConfigReloj:
+		
 		CPI R16, 2
-		BREQ OperacionRelojDisplay3
+		BRNE NEXT3_ConfigReloj
+		RJMP OperacionRelojDisplay3
+		NEXT3_ConfigReloj:
+		
 		CPI R16, 3
-		BREQ OperacionRelojDisplay4
+		BRNE NEXT4_ConfigReloj
+		RJMP OperacionRelojDisplay4
+		NEXT4_ConfigReloj:
+		RJMP Salir_IBotones
 
 		OperacionRelojDisplay1:
 			CLR R16
@@ -1030,6 +1153,7 @@ Botones_Modo_Config:
 
 			SeguirORD1:
 			STS RELOJ1Config, R16
+
 			RJMP Salir_IBotones
 
 		Reset_R1_UP:
@@ -1052,6 +1176,7 @@ Botones_Modo_Config:
 
 			SeguirORD2:
 			STS RELOJ2Config, R16
+
 			RJMP Salir_IBotones
 
 		Reset_R2_UP:
@@ -1084,6 +1209,7 @@ Botones_Modo_Config:
 
 			SeguirORD3:
 			STS RELOJ3Config, R16
+
 			RJMP Salir_IBotones
 
 		Reset_R3_UP:
@@ -1113,7 +1239,6 @@ Botones_Modo_Config:
 			//Reset_Display3_BC_Display4 (Reinicia el Display 3 porque el Display 4 lo indica)
 			CLR R18
 			STS RELOJ3Config, R18
-		
 			Seguir_Display3_Check_Range:
 
 			CPI R16, 3
@@ -1123,6 +1248,7 @@ Botones_Modo_Config:
 
 			SeguirORD4:
 			STS RELOJ4Config, R16
+
 			RJMP Salir_IBotones
 
 		Reset_R4_UP:
@@ -1378,7 +1504,164 @@ Botones_Modo_Config:
 
 //---------------- BOTONES CONFIGURACIÓN FECHA ----------------
 
+//---------------- BOTONES CONFIGURACIÓN ALARMA ----------------
+	ConfigAlarma:
+		LDI R17, 0
+		IN R16, PINC
+
+		SBRS R16, PC1
+		INC R17
+		SBRS R16, PC0
+		DEC R17
+
+		CLR R16
+		LDS R16, DisplayConfigurando
+		
+		CPI R16, 0
+		BRNE NEXT1_ConfigAlarma
+		RJMP OperacionAlarmaDisplay1
+		NEXT1_ConfigAlarma:
+
+		CPI R16, 1
+		BRNE NEXT2_ConfigAlarma
+		RJMP OperacionAlarmaDisplay2
+		NEXT2_ConfigAlarma:
+		
+		CPI R16, 2
+		BRNE NEXT3_ConfigAlarma
+		RJMP OperacionAlarmaDisplay3
+		NEXT3_ConfigAlarma:
+		
+		CPI R16, 3
+		BRNE NEXT4_ConfigAlarma
+		RJMP OperacionAlarmaDisplay4
+		NEXT4_ConfigAlarma:
+		RJMP Salir_IBotones
+
+		OperacionAlarmaDisplay1:
+			CLR R16
+			LDS R16, ALARMA1Config
+			ADD R16, R17
+
+			CPI R16, 10
+			BREQ Reset_A1_UP
+			CPI R16, -1
+			BREQ Reset_A1_DOWN
+
+			SeguirOAD1:
+			STS ALARMA1Config, R16
+
+			RJMP Salir_IBotones
+
+		Reset_A1_UP:
+		LDI R16, 0
+		RJMP SeguirOAD1
+
+		Reset_A1_DOWN:
+		LDI R16, 9
+		RJMP SeguirOAD1
+
+		OperacionAlarmaDisplay2:
+			CLR R16
+			LDS R16, ALARMA2Config
+			ADD R16, R17
+
+			CPI R16, 6
+			BREQ Reset_A2_UP
+			CPI R16, -1
+			BREQ Reset_A2_DOWN
+
+			SeguirOAD2:
+			STS ALARMA2Config, R16
+
+			RJMP Salir_IBotones
+
+		Reset_A2_UP:
+		LDI R16, 0
+		RJMP SeguirOAD2
+
+		Reset_A2_DOWN:
+		LDI R16, 5
+		RJMP SeguirOAD2
+
+		OperacionAlarmaDisplay3:
+			CLR R16
+			LDS R16, ALARMA3Config
+			ADD R16, R17
+
+			CLR R18
+			LDS R18, ALARMA4Config
+			CPI R18, 2
+			BRNE Seguir_COM_OAD
+			CPI R16, 4
+			BREQ Reset_A3_UP
+			CPI R16, -1
+			BREQ Reset_A3_DOWN_2
+
+			Seguir_COM_OAD:
+			CPI R16, 10
+			BREQ Reset_A3_UP
+			CPI R16, -1
+			BREQ Reset_A3_DOWN
+
+			SeguirOAD3:
+			STS ALARMA3Config, R16
+
+			RJMP Salir_IBotones
+
+		Reset_A3_UP:
+		LDI R16, 0
+		RJMP SeguirOAD3
+
+		Reset_A3_DOWN:
+		LDI R16, 9
+		RJMP SeguirOAD3
+
+		Reset_A3_DOWN_2:
+		LDI R16, 3
+		RJMP Seguir_COM_OAD
+
+		OperacionAlarmaDisplay4:
+			CLR R16
+			LDS R16, ALARMA4Config
+			ADD R16, R17
+
+			CPI R16, 2
+			BRNE Seguir_Display3_Check_Range_ALARMA
+			//Display3_Check_Range
+			CLR R18
+			LDS R18, ALARMA3Config
+			CPI R18, 4
+			BRLO Seguir_Display3_Check_Range_ALARMA
+			//Reset_Display3_BC_Display4 (Reinicia el Display 3 porque el Display 4 lo indica)
+			CLR R18
+			STS ALARMA3Config, R18
+			Seguir_Display3_Check_Range_ALARMA:
+
+			CPI R16, 3
+			BREQ Reset_A4_UP
+			CPI R16, -1
+			BREQ Reset_A4_DOWN
+
+			SeguirOAD4:
+			STS ALARMA4Config, R16
+
+			RJMP Salir_IBotones
+
+		Reset_A4_UP:
+		LDI R16, 0
+		RJMP SeguirOAD4
+
+		Reset_A4_DOWN:
+		LDI R16, 2
+		RJMP SeguirOAD4
+//---------------- BOTONES CONFIGURACIÓN RELOJ ----------------
+
 	Salir_IBotones:
+	POP R16
+	POP R17
+	POP R18 
+	POP R21
 	RETI
 
 /**************************************************************************
