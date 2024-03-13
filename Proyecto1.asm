@@ -7,7 +7,7 @@ Autor: Alexander Rosales
 Proyecto: Proyecto 1
 Hardware: ATMEGA328P
 Creado: 20/02/2024
-Última Modificación: 20/02/2024
+Última Modificación: 13/03/2024
 
 ***/
 
