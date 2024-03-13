@@ -7,7 +7,7 @@ Autor: Alexander Rosales
 Proyecto: Proyecto 1
 Hardware: ATMEGA328P
 Creado: 20/02/2024
-Última Modificación: 13/03/2024
+Última Modificación: 13/02/2024
 
 ***/
 
@@ -137,6 +137,8 @@ Setup:
 	.equ ALARMA4Config = 0x0128 //Display 4 CONFIGURANDO ALARMA
 
 	.equ Contador500msDesactualizado = 0x010A 
+
+	.equ ContadorLEDS = 0x010B 
 	 
 	STS RELOJ1, R16
 	STS RELOJ2, R16
@@ -172,7 +174,8 @@ Setup:
 	STS ALARMA4Config, R16
 	STS DisplayConfigurando, R16
 
-	STS Contador500msDesactualizado, R16
+	STS ContadorLEDS, R16
+	STS Contador500msDesactualizado, Cada500ms
 
 	LDI ZL, LOW (Tabla << 1)
 	LDI ZH, HIGH (Tabla << 1)
@@ -187,33 +190,34 @@ DosPuntosOn:
 	LDI Dos_Puntos, 0b1000_0000
 RJMP SeguirDosPuntos
 
-CLR R16
-STS Contador500msDesactualizado, Cada500ms
-
 Loop:
 
 	CPI AlarmaON, 1
 	BRNE EjecutarLoopConEstados
 
 	//Millis :D
-	CLR R16
+		CLR R16
 		LDS R16, Contador500msDesactualizado
 		CP R16, Cada500ms
 		BREQ NoAumentarContador500
-			MOV R16, Cada500ms
-			STS Contador500msDesactualizado, R16
+			STS Contador500msDesactualizado, Cada500ms
+			LDS R18, ContadorLEDS
 			INC R18
+			STS ContadorLEDS, R18
 			CPI R18, 3
 			BRNE NoAumentarContador500
 			CLR R18
-	NoAumentarContador500:
+			STS ContadorLEDS, R18
+		NoAumentarContador500:
+		
 
 	//--------------------LED
 		LDI R16, 0b_0001_0000
 		OUT PORTB, R16
 
 		//Selector Dependiendo de R18
-			LDI R17, 0
+			LDS R18, ContadorLEDS
+			CLR R17
 
 			CPI R18, 0
 			BRNE Salto1_LEDAlarma
@@ -232,10 +236,11 @@ Loop:
 
 		OUT PORTD, R17
 	
-		RCALL Delay
+		//RCALL Delay
 	//--------------------LED
 
 	RJMP Loop
+
 	EjecutarLoopConEstados:
 	
 	SBRC R29, 0
