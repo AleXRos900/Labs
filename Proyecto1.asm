@@ -84,6 +84,8 @@ Setup:
 	LDI R16, 0b0000_0001
 	STS TIMSK0, R16
 
+
+
 	SEI
 
 	RCALL T0 //Se inicia el Timer
@@ -161,9 +163,13 @@ Setup:
 	STS FECHA3Config, R16
 	STS FECHA4Config, R16
 
-	LDI R16, 1
+	
 	STS ALARMA1, R16
+
+	LDI R16, 1
 	STS ALARMA2, R16
+
+	CLR R16
 	STS ALARMA3, R16
 	STS ALARMA4, R16
 
@@ -193,24 +199,10 @@ RJMP SeguirDosPuntos
 Loop:
 
 	CPI AlarmaON, 1
-	BRNE EjecutarLoopConEstados
-
-	//Millis :D
-		CLR R16
-		LDS R16, Contador500msDesactualizado
-		CP R16, Cada500ms
-		BREQ NoAumentarContador500
-			STS Contador500msDesactualizado, Cada500ms
-			LDS R18, ContadorLEDS
-			INC R18
-			STS ContadorLEDS, R18
-			CPI R18, 3
-			BRNE NoAumentarContador500
-			CLR R18
-			STS ContadorLEDS, R18
-		NoAumentarContador500:
-		
-
+	BREQ EjecutarLoopAlarma
+	RJMP EjecutarLoopConEstados
+	EjecutarLoopAlarma:
+	
 	//--------------------LED
 		LDI R16, 0b_0001_0000
 		OUT PORTB, R16
@@ -226,7 +218,7 @@ Loop:
 
 			CPI R18, 1
 			BRNE Salto2_LEDAlarma
-			LDI R17, 0b0000_0100
+			LDI R17, 0b0000_0101
 			Salto2_LEDAlarma:
 
 			CPI R18, 2
@@ -236,8 +228,14 @@ Loop:
 
 		OUT PORTD, R17
 	
-		//RCALL Delay
+		RCALL Delay
 	//--------------------LED
+
+	//---------------DISPLAYS
+
+
+
+	//---------------DISPLAYS
 
 	RJMP Loop
 
@@ -286,6 +284,8 @@ Loop:
 			OUT PORTD, R17
 
 			RCALL Delay
+
+
 		//---------------------D1
 
 		//---------------------D2
@@ -629,7 +629,17 @@ DecimaSegundo:
 MedioSegundo:
 	LDI R16, 1
 	EOR R29, R16
-	INC Cada500ms
+
+	CLR R16
+	LDS R16, ContadorLEDS
+	INC R16
+	CPI R16, 3
+	BRNE NoReiniciarContadorLeds
+	CLR R16
+	NoReiniciarContadorLeds:
+	STS ContadorLEDS, R16
+
+
 	RJMP SeguirMedioSegundo
 
 Flag0Check:	
@@ -705,8 +715,6 @@ Flag0Check:
 				CP R16, R17
 				BRNE NoSonarAlarma
 				LDI AlarmaON, 1
-				CLR R18
-				PUSH R18
 	NoSonarAlarma:
 
 	POP R16
@@ -1062,14 +1070,15 @@ IBotones:
 
 	SBRS R16, PC3
 	RCALL ToggleConfig
-
-	SBRS R16, PC2
-	RCALL ApagarAlarma
 	
 	SBRC Config, 0
 	RJMP Botones_Modo_Config
 
 	//Botones Modo Estado
+
+		SBRS R16, PC2
+		RCALL ApagarAlarma
+
 		SBRS R16, PC1
 		INC Estado
 		SBRS R16, PC0
@@ -1364,10 +1373,10 @@ Botones_Modo_Config:
 			CLR R18
 			LDS R18, FECHA4Config
 
-			CPI R21, 1
-			BRNE DONW_FECHA
+			//CPI R21, 1
+			//BRNE DONW_FECHA
 			RCALL Reset_F3_UP
-			DONW_FECHA:
+			//DONW_FECHA:
 			RCALL Reset_F3_DOWN
 
 			STS FECHA3Config, R16
@@ -1689,4 +1698,3 @@ SetTabla:
 	LDI ZL, LOW (Tabla << 1)
 	LDI ZH, HIGH (Tabla << 1)
 	RET
-
