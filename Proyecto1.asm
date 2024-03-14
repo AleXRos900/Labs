@@ -87,8 +87,10 @@ Setup:
 	LDI R16, 0b0000_0001
 	STS TIMSK0, R16
 	
+	/*
 	LDI R16, (1 << TOIE2) 
 	STS TIMSK2, R16
+	*/
 	
 	SEI
 
@@ -293,8 +295,10 @@ Loop:
 	SeguirDosPuntos:
 	
 
-	SBRS Config, 0
+	CPI Config, 0
+	BRNE SaltarALoopConfig
 	RJMP LoopNormal
+	SaltarALoopConfig:
 	RJMP LoopConfig
 	RJMP Loop
 	
@@ -347,11 +351,6 @@ Loop:
 				BRNE Salto2_Display2
 				LDS R17, FECHA2
 				Salto2_Display2:
-
-				CPI Estado, 2
-				BRNE Salto3_Display2
-				LDS R17, ALARMA2
-				Salto3_Display2:
 
 			RCALL SetTabla
 			ADD ZL, R17
@@ -708,7 +707,7 @@ Flag0Check:
 
 	INC R25 //Cada vez que la vandera TOV0 se encuienda, R25 suma 1
 	
-	SBRS R25, 2
+	SBRS R25, 0
 	RJMP DecimaSegundo
 	SeguirDecimaSegundo:
 
@@ -719,11 +718,9 @@ Flag0Check:
 	CPI R25, 100
 	BRNE RegresarFlagTimer0
 
-	
-
 	CLR R25
 	INC R26
-	CPI R26, 1
+	CPI R26, 60
 	BRNE RegresarFlagTimer0
 
 	CLR R26
@@ -771,6 +768,8 @@ Flag0Check:
 				CP R16, R17
 				BRNE NoSonarAlarma
 				LDI AlarmaON, 1
+				LDI R16, (1 << TOIE2) 
+				STS TIMSK2, R16
 	NoSonarAlarma:
 
 	POP R16
@@ -1113,6 +1112,8 @@ ConfigSiguienteDigito:
 
 ApagarAlarma:
 	CLR AlarmaON
+	LDI R17, (0 << TOIE2) 
+	STS TIMSK2, R17
 RET
 
 IBotones:
@@ -1124,6 +1125,12 @@ IBotones:
 
 	IN R16, PINC
 
+	CPI AlarmaON, 1
+	BRNE NoPoderApagarAlarma
+		SBRS R16, PC2
+		RCALL ApagarAlarma
+	NoPoderApagarAlarma:
+
 	SBRS R16, PC3
 	RCALL ToggleConfig
 	
@@ -1131,9 +1138,6 @@ IBotones:
 	RJMP Botones_Modo_Config
 
 	//Botones Modo Estado
-
-		SBRS R16, PC2
-		RCALL ApagarAlarma
 
 		SBRS R16, PC1
 		INC Estado
