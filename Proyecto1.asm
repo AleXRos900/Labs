@@ -18,13 +18,16 @@ ENCABEZADO
 .CSEG //Empieza el codigo
 .ORG 0x00 //Se inicia en la posición 00
 
-JMP EmpezarCodigo
+RJMP EmpezarCodigo
 
 .ORG 0x0008
-JMP IBotones
+RJMP IBotones
+
+.ORG 0x0012
+RJMP Flag2Check
 
 .ORG 0x0020
-JMP Flag0Check
+RJMP Flag0Check
 
 EmpezarCodigo:
 
@@ -64,7 +67,7 @@ Setup:
 	LDI R16, 0b0000_0001 //8M
 	STS CLKPR, R16
 
-	LDI R16, 0b0000_0000 //Se configura el puerto c como entradas 
+	LDI R16, 0b0001_0000 //Se configura el puerto c como entradas 
 	OUT DDRC, R16
 
 	LDI R16, 0x00 //Se desactiva la led de TX y RX que constantemente está encendida
@@ -83,12 +86,14 @@ Setup:
 
 	LDI R16, 0b0000_0001
 	STS TIMSK0, R16
-
-
-
+	
+	LDI R16, (1 << TOIE2) 
+	STS TIMSK2, R16
+	
 	SEI
 
 	RCALL T0 //Se inicia el Timer
+	RCALL T2 //Se inicia el Timer
 
 	CLR R16	//Uso Multiple
 	CLR R17 //Uso Multiple
@@ -141,6 +146,10 @@ Setup:
 	.equ Contador500msDesactualizado = 0x010A 
 
 	.equ ContadorLEDS = 0x010B 
+
+	.equ Tempo = 0x010C 
+
+	.equ AlarmaPWM = 0x010D
 	 
 	STS RELOJ1, R16
 	STS RELOJ2, R16
@@ -163,13 +172,11 @@ Setup:
 	STS FECHA3Config, R16
 	STS FECHA4Config, R16
 
-	
+	LDI R16, 5
 	STS ALARMA1, R16
 
-	LDI R16, 1
-	STS ALARMA2, R16
-
 	CLR R16
+	STS ALARMA2, R16
 	STS ALARMA3, R16
 	STS ALARMA4, R16
 
@@ -181,6 +188,9 @@ Setup:
 	STS DisplayConfigurando, R16
 
 	STS ContadorLEDS, R16
+	STS Tempo, R16
+	STS AlarmaPWM, R16
+
 	STS Contador500msDesactualizado, Cada500ms
 
 	LDI ZL, LOW (Tabla << 1)
@@ -203,11 +213,14 @@ Loop:
 	RJMP EjecutarLoopConEstados
 	EjecutarLoopAlarma:
 	
+
+
 	//--------------------LED
 		LDI R16, 0b_0001_0000
 		OUT PORTB, R16
 
 		//Selector Dependiendo de R18
+			CLR R18	
 			LDS R18, ContadorLEDS
 			CLR R17
 
@@ -227,12 +240,42 @@ Loop:
 			Salto3_LEDAlarma:
 
 		OUT PORTD, R17
-	
+
+		CLR R16
+		LDS R16, AlarmaPWM
+		OUT PORTC, R16
+		
 		RCALL Delay
 	//--------------------LED
 
 	//---------------DISPLAYS
+		LDI R16, 0b_0000_1111
+		OUT PORTB, R16
 
+		CLR R17	
+
+		CPI R18, 0
+		BRNE Salto1_DisplayAlarma
+		LDI R17, 0b0000_1000
+		Salto1_DisplayAlarma:
+
+		CPI R18, 1
+		BRNE Salto2_DisplayAlarma
+		LDI R17, 0b0000_0001
+		Salto2_DisplayAlarma:
+
+		CPI R18, 2
+		BRNE Salto3_DisplayAlarma
+		LDI R17, 0b0000_0010
+		Salto3_DisplayAlarma:
+
+		OUT PORTD, R17
+
+		CLR R16
+		LDS R16, AlarmaPWM
+		OUT PORTC, R16
+
+		RCALL Delay
 
 
 	//---------------DISPLAYS
@@ -240,6 +283,9 @@ Loop:
 	RJMP Loop
 
 	EjecutarLoopConEstados:
+
+	CLR R16
+	OUT PORTC, R16
 	
 	SBRC R29, 0
 	RJMP DosPuntosOn
@@ -624,6 +670,7 @@ Loop:
 DecimaSegundo:
 	LDI R16, 2
 	EOR R29, R16
+
 	RJMP SeguirDecimaSegundo
 
 MedioSegundo:
@@ -639,6 +686,13 @@ MedioSegundo:
 	NoReiniciarContadorLeds:
 	STS ContadorLEDS, R16
 
+	CPI AlarmaON, 1
+	BRNE NoSumarTempo
+		CLR R16
+		LDS R16, Tempo
+		INC R16
+		STS Tempo, R16
+	NoSumarTempo:
 
 	RJMP SeguirMedioSegundo
 
@@ -654,7 +708,7 @@ Flag0Check:
 
 	INC R25 //Cada vez que la vandera TOV0 se encuienda, R25 suma 1
 	
-	SBRS R25, 0
+	SBRS R25, 2
 	RJMP DecimaSegundo
 	SeguirDecimaSegundo:
 
@@ -664,6 +718,8 @@ Flag0Check:
 
 	CPI R25, 100
 	BRNE RegresarFlagTimer0
+
+	
 
 	CLR R25
 	INC R26
@@ -1056,7 +1112,7 @@ ConfigSiguienteDigito:
 	RET
 
 ApagarAlarma:
-	CLR AlarmaOn
+	CLR AlarmaON
 RET
 
 IBotones:
@@ -1682,9 +1738,119 @@ Botones_Modo_Config:
 ----BOTONES---BOTONES---BOTONES---BOTONES---BOTONES---BOTONES---BOTONES----
 **************************************************************************/
 
+/**************************************************************************
+---MUSICA---MUSICA---MUSICA---MUSICA---MUSICA---MUSICA---MUSICA---MUSICA---
+**************************************************************************/
+
+T2:
+	LDI R16, (1 << CS21) | (1 << CS20) //Configuración del pre escalado a 32
+	STS TCCR2B, R16
+
+	
+	LDI R16, 6
+	STS TCNT2, R16
+	
+	RET
+
+Flag2Check:
+
+	PUSH R16
+	PUSH R17
+	PUSH R18
+	PUSH R21
+
+	CPI AlarmaON, 1
+	BREQ EmpezarMusicaAlarma
+		LDI R16, 6
+		STS TCNT2, R16
+		RJMP SaltarFlag2
+
+	EmpezarMusicaAlarma:
+	
+	LDI R17, 0x10
+	CLR R16
+	LDS R16, AlarmaPWM
+	EOR R16, R17
+	STS AlarmaPWM, R16
+
+	CLR R16
+	LDS R16, Tempo
+
+	//196 Sol#
+	//199 La
+	//202 La#
+	//205 Si
+
+	CPI R16, 1
+	BRSH Nota2
+		LDI R17, 205
+		STS TCNT2, R17
+		RJMP SaltarFlag2
+	
+	Nota2:
+	CPI R16, 3
+	BRSH Nota3
+		LDI R17, 199 
+		STS TCNT2, R17
+		RJMP SaltarFlag2
+
+	Nota3:
+	CPI R16, 6
+	BRSH Nota4
+		LDI R16, 6
+		STS TCNT2, R16
+		CLR R16
+		STS AlarmaPWM, R16
+		RJMP SaltarFlag2
+
+	Nota4:
+	CPI R16, 7
+	BRSH Nota5
+		LDI R17, 205 
+		STS TCNT2, R17
+		RJMP SaltarFlag2
+
+	Nota5:
+	CPI R16, 8
+	BRSH Nota6
+		LDI R17, 199 
+		STS TCNT2, R17
+		RJMP SaltarFlag2
+
+	Nota6:
+	CPI R16, 9
+	BRSH Nota7
+		LDI R17, 205 
+		STS TCNT2, R17
+		RJMP SaltarFlag2
+
+	Nota7:
+	CPI R16, 10
+	BRSH ReiniciarTempo
+		LDI R17, 199 
+		STS TCNT2, R17
+		RJMP SaltarFlag2
+	
+	ReiniciarTempo:
+		CLR R16
+		STS Tempo, R16
+		RJMP SaltarFlag2
+
+	SaltarFlag2:
+	POP R16
+	POP R17
+	POP R18
+	POP R21
+	RETI 
+
+
+/**************************************************************************
+---MUSICA---MUSICA---MUSICA---MUSICA---MUSICA---MUSICA---MUSICA---MUSICA---
+**************************************************************************/
+
 Delay:
 	LDI R27, 255
-	LDI R28, 10
+	LDI R28, 15
 	loop_delay:
 		DEC R27
 		BRNE loop_delay
