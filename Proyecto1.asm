@@ -355,6 +355,11 @@ Loop:
 				LDS R17, FECHA2
 				Salto2_Display2:
 
+				CPI Estado, 2
+				BRNE Salto3_Display2
+				LDS R17, ALARMA2
+				Salto3_Display2:
+
 			RCALL SetTabla
 			ADD ZL, R17
 			LPM R17, Z
