@@ -152,6 +152,8 @@ Setup:
 	.equ Tempo = 0x010C 
 
 	.equ AlarmaPWM = 0x010D
+
+	.equ AlarmaYaApagada = 0x010E
 	 
 	STS RELOJ1, R16
 	STS RELOJ2, R16
@@ -192,6 +194,7 @@ Setup:
 	STS ContadorLEDS, R16
 	STS Tempo, R16
 	STS AlarmaPWM, R16
+	STS AlarmaYaApagada, R16
 
 	STS Contador500msDesactualizado, Cada500ms
 
@@ -748,7 +751,7 @@ Flag0Check:
 	LDS R16, RELOJ1
 	LDS R17, ALARMA1
 	CP R16, R17
-	BRNE NoSonarAlarma
+	BRNE NoSonarAlarma1
 		CLR R16
 		CLR R17
 		LDS R16, RELOJ2
@@ -767,9 +770,19 @@ Flag0Check:
 				LDS R17, ALARMA4
 				CP R16, R17
 				BRNE NoSonarAlarma
-				LDI AlarmaON, 1
-				LDI R16, (1 << TOIE2) 
-				STS TIMSK2, R16
+				CLR R16
+				LDS R16, AlarmaYaApagada
+				CPI R16, 1
+				BREQ NoSonarAlarma
+					LDI AlarmaON, 1
+					LDI R16, (1 << TOIE2) 
+					STS TIMSK2, R16
+					RJMP NoSonarAlarma
+	NoSonarAlarma1:
+	LDS R16, AlarmaYaApagada
+	CLR R16
+	STS AlarmaYaApagada, R16	
+	
 	NoSonarAlarma:
 
 	POP R16
@@ -1112,6 +1125,11 @@ ConfigSiguienteDigito:
 
 ApagarAlarma:
 	CLR AlarmaON
+	CLR R17
+	LDS R17, AlarmaYaApagada
+	LDI R17, 1
+	STS AlarmaYaApagada, R17
+	LDI R17, 1
 	LDI R17, (0 << TOIE2) 
 	STS TIMSK2, R17
 RET
@@ -1123,6 +1141,7 @@ IBotones:
 	PUSH R18
 	PUSH R21
 
+	CLR R16
 	IN R16, PINC
 
 	CPI AlarmaON, 1
