@@ -6,6 +6,7 @@
  */ 
 #include "PWM1.h"
 
+//Video de Youtube: https://youtu.be/b1DDGge6kzc
 void Init_PWM1_Fast_A()
 {
 	DDRD |= (1 << DDB1);
