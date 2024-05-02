@@ -5,6 +5,7 @@
  * Author : Alex
  */ 
 
+//Video: https://youtu.be/Ye3r9Vf9wLo
 
 #include <avr/io.h>
 #define F_CPU 16000000
